@@ -1,0 +1,59 @@
+# Pull variant: fetch approved onboarding requests from ServiceNow and open one PR per request.
+# PRs are opened with a GitHub App token (GITHUB_TOKEN may not create PRs in this org, and App PRs trigger checks).
+name: sync-servicenow
+
+on:
+  schedule:
+    - cron: "7,22,37,52 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sync-servicenow
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # ServiceNow credentials live in this environment, which only the main branch may use.
+    environment:
+      name: servicenow
+      deployment: false
+    steps:
+      - name: Create GitHub App token (contents + pull requests, this repository only)
+        id: app-token
+        uses: actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc # v3.4.0
+        with:
+          client-id: ${{ vars.CATALOG_APP_CLIENT_ID }}
+          private-key: ${{ secrets.CATALOG_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22"
+
+      - name: Sync approved requests from ServiceNow
+        env:
+          SN_INSTANCE: ${{ vars.SN_INSTANCE }}
+          SN_API_PATH: ${{ vars.SN_API_PATH }}
+          SN_USER: ${{ secrets.SN_USER }}
+          SN_PASSWORD: ${{ secrets.SN_PASSWORD }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          APP_SLUG: ${{ steps.app-token.outputs.app-slug }}
+        run: |
+          [[ "$APP_SLUG" =~ ^[a-z0-9-]+$ ]] || { echo "::error::unexpected app slug"; exit 1; }
+          APP_USER_ID="$(gh api "/users/${APP_SLUG}%5Bbot%5D" --jq .id)"
+          git config user.name "${APP_SLUG}[bot]"
+          git config user.email "${APP_USER_ID}+${APP_SLUG}[bot]@users.noreply.github.com"
+          node scripts/sync-servicenow.mjs

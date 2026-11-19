@@ -1,0 +1,3 @@
+# Automation and validation are owned by the platform team. Entries in apis/ are approved in ServiceNow.
+/.github/ @api-mgmt-poc/platform-team
+/scripts/ @api-mgmt-poc/platform-team

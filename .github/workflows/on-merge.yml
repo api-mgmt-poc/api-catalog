@@ -1,0 +1,40 @@
+# After a catalog entry is merged: tell ServiceNow that provisioning has started.
+# No concurrency group: every run reports only the entries added by its own push.
+name: on-merge
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apis/*.json"
+
+permissions:
+  contents: read
+
+jobs:
+  report-provisioning:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment:
+      name: servicenow
+      deployment: false
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22"
+
+      - name: Report merged requests to ServiceNow
+        env:
+          SN_INSTANCE: ${{ vars.SN_INSTANCE }}
+          SN_API_PATH: ${{ vars.SN_API_PATH }}
+          SN_USER: ${{ secrets.SN_USER }}
+          SN_PASSWORD: ${{ secrets.SN_PASSWORD }}
+          BEFORE_SHA: ${{ github.event.before }}
+        run: node scripts/report-merged.mjs "$BEFORE_SHA"

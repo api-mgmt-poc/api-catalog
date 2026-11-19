@@ -1,0 +1,50 @@
+# Manual step after the platform created the API repository (PoC: OpenTofu runs locally).
+# The request number is read from the merged catalog entry, never typed in.
+name: report-done
+
+on:
+  workflow_dispatch:
+    inputs:
+      api_name:
+        description: API name from the catalog entry (apis/<api_name>.json)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  report-done:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment:
+      name: servicenow
+      deployment: false
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22"
+
+      - name: Report repository creation to ServiceNow
+        env:
+          SN_INSTANCE: ${{ vars.SN_INSTANCE }}
+          SN_API_PATH: ${{ vars.SN_API_PATH }}
+          SN_USER: ${{ secrets.SN_USER }}
+          SN_PASSWORD: ${{ secrets.SN_PASSWORD }}
+          GH_TOKEN: ${{ github.token }}
+          API_NAME: ${{ inputs.api_name }}
+          ORG: ${{ github.repository_owner }}
+        run: |
+          [[ "$API_NAME" =~ ^[a-z][a-z0-9-]{1,38}[a-z0-9]$ ]] || { echo "::error::invalid api_name"; exit 1; }
+          test -f "apis/$API_NAME.json" || { echo "::error::api_name not in catalog"; exit 1; }
+          RITM="$(jq -r .servicenow_ritm "apis/$API_NAME.json")"
+          [[ "$RITM" =~ ^RITM[0-9]{7}$ ]] || { echo "::error::catalog entry has no valid request number"; exit 1; }
+          gh api "repos/$ORG/api-$API_NAME" --silent || { echo "::error::repository api-$API_NAME not found"; exit 1; }
+          node scripts/report-status.mjs "$RITM" "done" "Repository https://github.com/$ORG/api-$API_NAME created"

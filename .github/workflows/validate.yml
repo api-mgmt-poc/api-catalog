@@ -1,0 +1,31 @@
+# Required check for every catalog pull request. No path filter on purpose (a skipped required check blocks merges).
+name: validate
+
+on:
+  pull_request:
+  merge_group:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-entries:
+    name: validate-entries
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22"
+
+      - name: Unit tests
+        run: node --test "scripts/test/*.test.mjs"
+
+      - name: Validate catalog entries
+        run: node scripts/validate-entries.mjs
