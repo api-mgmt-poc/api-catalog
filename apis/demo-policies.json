@@ -1,9 +1,0 @@
-{
-  "servicenow_ritm": "RITM0010004",
-  "api_name": "demo-policies",
-  "owner_group": "team-demo",
-  "data_class": "internal",
-  "backend_url_dev": "https://dev.example.invalid/policies",
-  "backend_url_prod": "https://prod.example.invalid/policies",
-  "description": "End-to-end test of the onboarding flow (dummy data)"
-}
